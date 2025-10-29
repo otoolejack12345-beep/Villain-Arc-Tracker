@@ -131,13 +131,17 @@ function updateDisplay(){
   document.getElementById('xpDisplay').textContent=villainData.xp;
   document.getElementById('xpNextDisplay').textContent=villainData.xpToNextLevel;
   document.getElementById('xpFill').style.width = `${(villainData.xp/villainData.xpToNextLevel)*100}%`;
-  document.getElementById('caloriesTodayDisplay').textContent = villainData.caloriesToday||0;
-  document.getElementById('burnedTodayDisplay').textContent = villainData.burnedToday||0;
-  let net = (villainData.caloriesToday||0) - (villainData.burnedToday||0);
+
+  document.getElementById('caloriesTodayDisplay').textContent = villainData.caloriesToday || 0;
+  document.getElementById('burnedTodayDisplay').textContent = villainData.burnedToday || 0;
+
+  let net = (villainData.caloriesToday || 0) - (villainData.burnedToday || 0);
   document.getElementById('netCaloriesDisplay').textContent = net;
-  document.getElementById('dailyCaloriesDisplay').textContent = villainData.dailyCalorieGoal||0;
-  let remaining = (villainData.dailyCalorieGoal||0) - net;
+
+  let remaining = (villainData.dailyCalorieGoal || 0) - net;
+  if(remaining<0) remaining=0;
   document.getElementById('caloriesRemainingDisplay').textContent = remaining;
+
   document.getElementById('weightDisplay').textContent = villainData.weight;
   document.getElementById('goalWeightDisplay').textContent = villainData.goalWeight;
 }
@@ -169,23 +173,22 @@ function renderMeals(){
 }
 
 function addMeal(){
-  let name=document.getElementById('mealName').value;
-  let calories=parseInt(document.getElementById('mealCalories').value)||0;
-  if(name && calories>0){
-    villainData.meals.push({name, calories, date:todayDate});
-    villainData.caloriesToday += calories;
-    saveData();
-    renderMeals();
-    updateDisplay();
-    updateProjectedChart();
-  }
+  let name=document.getElementById('mealName').value.trim();
+  let calories=Number(document.getElementById('mealCalories').value);
+  if(!name || isNaN(calories) || calories<=0){ alert("Enter valid meal name and calories."); return; }
+  villainData.meals.push({name, calories, date:todayDate});
+  villainData.caloriesToday += calories;
+  saveData();
+  renderMeals();
+  updateDisplay();
+  updateProjectedChart();
+  document.getElementById('mealName').value='';
+  document.getElementById('mealCalories').value='';
 }
 
 function removeMeal(index){
   let meal=villainData.meals[index];
-  if(meal.date===todayDate){
-    villainData.caloriesToday -= meal.calories;
-  }
+  if(meal.date===todayDate) villainData.caloriesToday -= meal.calories;
   villainData.meals.splice(index,1);
   saveData();
   renderMeals();
@@ -194,11 +197,13 @@ function removeMeal(index){
 }
 
 function addBurned(){
-  let burned=parseInt(document.getElementById('burnedCalories').value)||0;
+  let burned=Number(document.getElementById('burnedCalories').value);
+  if(isNaN(burned) || burned<=0){ alert("Enter valid burned calories."); return; }
   villainData.burnedToday += burned;
   saveData();
   updateDisplay();
   updateProjectedChart();
+  document.getElementById('burnedCalories').value='';
 }
 
 function addWeight(){
