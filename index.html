@@ -8,16 +8,16 @@
 <meta name="theme-color" content="#0a1f44">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body { margin:0; font-family:sans-serif; background:#0a1f44; color:#fff; }
-  .tab-bar { display:flex; justify-content:space-around; position:fixed; bottom:0; width:100%; background:#081634; }
-  .tab { padding:15px; flex:1; text-align:center; cursor:pointer; }
-  .tab.active { background:#12295e; }
-  .page { display:none; padding:20px; padding-bottom:70px; }
-  .page.active { display:block; }
-  #xpBar { width:100%; background:#12295e; height:20px; border-radius:10px; margin:10px 0; }
-  #xpFill { height:100%; background:#00ff00; width:0%; border-radius:10px; }
-  input, button { margin:5px 0; padding:5px; }
-  canvas { background:#081634; border-radius:10px; }
+body { margin:0; font-family:sans-serif; background:#0a1f44; color:#fff; }
+.tab-bar { display:flex; justify-content:space-around; position:fixed; bottom:0; width:100%; background:#081634; }
+.tab { padding:15px; flex:1; text-align:center; cursor:pointer; }
+.tab.active { background:#12295e; }
+.page { display:none; padding:20px; padding-bottom:70px; }
+.page.active { display:block; }
+#xpBar { width:100%; background:#12295e; height:20px; border-radius:10px; margin:10px 0; }
+#xpFill { height:100%; background:#00ff00; width:0%; border-radius:10px; }
+input, button { margin:5px 0; padding:5px; }
+canvas { background:#081634; border-radius:10px; }
 </style>
 <script>
 if('serviceWorker' in navigator){
@@ -43,7 +43,7 @@ if('serviceWorker' in navigator){
   <canvas id="projectedChart"></canvas>
 </div>
 
-<!-- Daily Calories Page -->
+<!-- Calories Page -->
 <div id="caloriesPage" class="page">
   <h2>Log Calories</h2>
   <input type="text" id="mealName" placeholder="Meal Name">
@@ -71,10 +71,10 @@ if('serviceWorker' in navigator){
 
 <!-- Tab Bar -->
 <div class="tab-bar">
-  <div class="tab active" onclick="showPage('dashboard')">Dashboard</div>
-  <div class="tab" onclick="showPage('caloriesPage')">Calories</div>
-  <div class="tab" onclick="showPage('weightPage')">Weight</div>
-  <div class="tab" onclick="showPage('goalsPage')">Goals</div>
+  <div class="tab active" onclick="showPage('dashboard', event)">Dashboard</div>
+  <div class="tab" onclick="showPage('caloriesPage', event)">Calories</div>
+  <div class="tab" onclick="showPage('weightPage', event)">Weight</div>
+  <div class="tab" onclick="showPage('goalsPage', event)">Goals</div>
 </div>
 
 <script>
@@ -92,7 +92,7 @@ let villainData = JSON.parse(localStorage.getItem('villainData')) || {
 };
 
 // Tab switching
-function showPage(id){
+function showPage(id,event){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -116,30 +116,47 @@ function renderMeals(){
 // Weight tracking
 function addWeight(){
   let w=parseFloat(document.getElementById('weightInput').value);
-  if(w){ villainData.weight=w; villainData.weights.push({date:new Date().toLocaleDateString(), weight:w}); saveData(); updateWeightChart(); updateDisplay(); }
+  if(!w) return;
+  villainData.weight=w;
+  villainData.weights.push({date:new Date().toLocaleDateString(), weight:w});
+  saveData();
+  updateWeightChart();
+  updateProjectedChart();
+  updateDisplay();
 }
 
 // Charts
-let weightChart = new Chart(document.getElementById('weightChart'), {type:'line', data:{labels:[], datasets:[{label:'Weight',data:[], borderColor:'lime', fill:false}]}, options:{scales:{y:{beginAtZero:false}}}});
-let projectedChart = new Chart(document.getElementById('projectedChart'), {type:'line', data:{labels:[], datasets:[{label:'Projected Weight',data:[], borderColor:'yellow', fill:false}]}, options:{scales:{y:{beginAtZero:false}}}});
+let weightChart = new Chart(document.getElementById('weightChart'), {
+  type:'line',
+  data:{labels:[], datasets:[{label:'Weight',data:[], borderColor:'lime', fill:false}]},
+  options:{scales:{y:{beginAtZero:false}}}
+});
+
+let projectedChart = new Chart(document.getElementById('projectedChart'), {
+  type:'line',
+  data:{labels:[], datasets:[{label:'Projected Weight',data:[], borderColor:'yellow', fill:false}]},
+  options:{scales:{y:{beginAtZero:false}}}
+});
 
 function updateWeightChart(){
   let labels=villainData.weights.map(w=>w.date);
   let data=villainData.weights.map(w=>w.weight);
-  weightChart.data.labels=labels; weightChart.data.datasets[0].data=data; weightChart.update();
+  weightChart.data.labels=labels;
+  weightChart.data.datasets[0].data=data;
+  weightChart.update();
 }
 
 function updateProjectedChart(){
   let labels=[], data=[];
-  let currentWeight=villainData.weight;
-  let goalWeight=villainData.goalWeight;
-  let dailyCalories=villainData.dailyCalorieGoal;
-  let BMR=2500;
-  let dailyDeficit=BMR-dailyCalories;
-  let projectedWeight=currentWeight;
+  let currentWeight = villainData.weight || 200;
+  let goalWeight = villainData.goalWeight || 180;
+  let dailyCalories = villainData.dailyCalorieGoal || 2000;
+  let BMR = 2500;
+  let dailyDeficit = BMR - dailyCalories;
+  let projectedWeight = currentWeight;
   for(let i=1;i<=30;i++){
-    projectedWeight-=(dailyDeficit/3500);
-    if(projectedWeight<goalWeight) projectedWeight=goalWeight;
+    projectedWeight -= dailyDeficit/3500;
+    if(projectedWeight < goalWeight) projectedWeight = goalWeight;
     labels.push(`Day ${i}`);
     data.push(projectedWeight.toFixed(1));
   }
@@ -156,22 +173,26 @@ function saveGoals(){
   if(name) villainData.villainName=name;
   if(goalW) villainData.goalWeight=goalW;
   if(dailyC) villainData.dailyCalorieGoal=dailyC;
-  saveData(); updateDisplay();
+  saveData(); updateDisplay(); updateProjectedChart();
 }
 
-// Dashboard
+// Dashboard display
 function updateDisplay(){
   document.getElementById('villainNameDisplay').textContent=villainData.villainName;
   document.getElementById('levelDisplay').textContent=villainData.level;
   document.getElementById('xpDisplay').textContent=villainData.xp;
   document.getElementById('xpNextDisplay').textContent=villainData.xpToNextLevel;
-  document.getElementById('xpFill').style.width=`${(villainData.xp/villainData.xpToNextLevel)*100}%`;
+  document.getElementById('xpFill').style.width = `${(villainData.xp/villainData.xpToNextLevel)*100}%`;
   document.getElementById('caloriesTodayDisplay').textContent=villainData.caloriesToday;
   document.getElementById('dailyCaloriesDisplay').textContent=villainData.dailyCalorieGoal;
   document.getElementById('weightDisplay').textContent=villainData.weight;
   document.getElementById('goalWeightDisplay').textContent=villainData.goalWeight;
+  renderMeals();
 }
-renderMeals(); updateWeightChart(); updateProjectedChart(); updateDisplay();
+
+updateWeightChart();
+updateProjectedChart();
+updateDisplay();
 </script>
 
 </body>
