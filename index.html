@@ -88,7 +88,7 @@ let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   xpToNextLevel: 100,
   caloriesToday:0,
   dailyCalorieGoal:2000,
-  weight:200,
+  weight:277,
   goalWeight:180,
   meals:[],
   weights:[],
@@ -106,6 +106,21 @@ function showPage(id,event){
 
 // Save data
 function saveData(){ localStorage.setItem('villainData', JSON.stringify(villainData)); }
+
+// XP based on weight loss
+function updateXPByWeight() {
+  const startWeight = 277;
+  const step = 10;
+  let lost = startWeight - villainData.weight;
+  if (lost < 0) lost = 0;
+  let level = Math.floor(lost / step) + 1;
+  villainData.level = level;
+  let xpInStep = lost % step;
+  villainData.xp = xpInStep * 10; // 10 XP per lb in step
+  villainData.xpToNextLevel = step * 10;
+  saveData();
+  updateDisplay();
+}
 
 // Add meal
 function addMeal(){
@@ -144,10 +159,11 @@ function removeMeal(index){
 
 // Add weight
 function addWeight(){
-  let w=parseFloat(document.getElementById('weightInput').value);
+  let w = parseFloat(document.getElementById('weightInput').value);
   if(!w) return;
-  villainData.weight=w;
-  villainData.weights.push({date:new Date().toLocaleDateString(), weight:w});
+  villainData.weight = w;
+  villainData.weights.push({date:new Date().toLocaleDateString(), weight: w});
+  updateXPByWeight();
   saveData();
   updateWeightChart();
   updateProjectedChart();
@@ -177,7 +193,7 @@ function updateWeightChart(){
 // Corrected projected chart
 function updateProjectedChart(){
   let labels=[], data=[];
-  let currentWeight=villainData.weight || 200;
+  let currentWeight=villainData.weight || 277;
   let goalWeight=villainData.goalWeight || 180;
   let dailyCalories=villainData.dailyCalorieGoal || 2000;
   let height=villainData.height || 73;
@@ -187,7 +203,7 @@ function updateProjectedChart(){
   let BMR=66 + (6.23*currentWeight) + (12.7*height) - (6.8*age);
 
   let dailyDeficit=BMR - dailyCalories;
-  if(dailyDeficit<0) dailyDeficit=0; // no weight loss if eating more than BMR
+  if(dailyDeficit<0) dailyDeficit=0;
 
   let projectedWeight=currentWeight;
   for(let i=1;i<=30;i++){
