@@ -1,4 +1,4 @@
-const cacheName='villain-arc-cache-v1';
+const cacheName='villain-arc-cache-v2';
 const assetsToCache=[
   './index.html',
   './manifest.json',
