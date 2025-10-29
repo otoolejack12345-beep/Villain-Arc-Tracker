@@ -17,20 +17,13 @@ body { margin:0; font-family:sans-serif; background:#0a1f44; color:#fff; }
 #xpBar { width:100%; background:#12295e; height:20px; border-radius:10px; margin:10px 0; }
 #xpFill { height:100%; background:#00ff00; width:0%; border-radius:10px; }
 input, button { margin:5px 0; padding:5px; }
-canvas { background:#081634; border-radius:10px; }
+canvas { background:#081634; border-radius:10px; margin-top:10px; }
 button { cursor:pointer; }
 </style>
-<script>
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js')
-  .then(()=>console.log('Service Worker Registered'))
-  .catch(err=>console.log('SW registration failed:', err));
-}
-</script>
 </head>
 <body>
 
-<!-- Dashboard Page -->
+<!-- Dashboard -->
 <div id="dashboard" class="page active">
   <h2>Villain Dashboard</h2>
   <img id="avatar" src="icon.png" alt="Avatar" width="100">
@@ -38,8 +31,10 @@ if('serviceWorker' in navigator){
   <p>Level: <span id="levelDisplay"></span></p>
   <p>XP: <span id="xpDisplay"></span> / <span id="xpNextDisplay"></span></p>
   <div id="xpBar"><div id="xpFill"></div></div>
-  <p>Calories Today: <span id="caloriesTodayDisplay"></span> / <span id="dailyCaloriesDisplay"></span></p>
   <p>Weight: <span id="weightDisplay"></span> lbs / Goal: <span id="goalWeightDisplay"></span> lbs</p>
+  <p>Calories Today: <span id="caloriesTodayDisplay"></span> (Net: <span id="netCaloriesDisplay"></span>) / Goal: <span id="dailyCaloriesDisplay"></span></p>
+  <p>Calories Remaining: <span id="caloriesRemainingDisplay"></span></p>
+
   <h3>Projected Weight Loss (next 30 days)</h3>
   <canvas id="projectedChart"></canvas>
 </div>
@@ -51,9 +46,14 @@ if('serviceWorker' in navigator){
   <input type="number" id="mealCalories" placeholder="Calories">
   <button onclick="addMeal()">Add Meal</button>
   <ul id="mealList"></ul>
+
+  <h3>Calories Burned</h3>
+  <input type="number" id="burnedCalories" placeholder="Calories Burned">
+  <button onclick="addBurned()">Add Burned Calories</button>
+  <p>Total Burned Today: <span id="burnedTodayDisplay"></span></p>
 </div>
 
-<!-- Weight Tracker Page -->
+<!-- Weight Tracker -->
 <div id="weightPage" class="page">
   <h2>Weight Tracker</h2>
   <input type="number" id="weightInput" placeholder="Today's weight">
@@ -82,43 +82,54 @@ if('serviceWorker' in navigator){
 </div>
 
 <script>
+// Initialization
+let todayDate = new Date().toLocaleDateString();
 let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   villainName: 'Dark Villain',
   level: 1,
   xp: 0,
   xpToNextLevel: 100,
-  caloriesToday:0,
+  caloriesToday: 0,
+  burnedToday: 0,
   maintenanceCalories: 2500,
-  dailyCalorieGoal:2000,
-  weight:277,
-  goalWeight:180,
-  meals:[],
-  weights:[],
-  height:73,
-  age:19
+  dailyCalorieGoal: 2000,
+  weight: 277,
+  goalWeight: 180,
+  meals: [],
+  weights: [],
+  height: 73,
+  age: 19
 };
 
-// Tab switching
-function showPage(id,event){
+// Reset daily calories if a new day
+if (villainData.lastUpdate !== todayDate) {
+  villainData.caloriesToday = 0;
+  villainData.burnedToday = 0;
+  villainData.lastUpdate = todayDate;
+  saveData();
+}
+
+// Tabs
+function showPage(id, event){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   event.currentTarget.classList.add('active');
 }
 
-// Save data
+// Save
 function saveData(){ localStorage.setItem('villainData', JSON.stringify(villainData)); }
 
-// XP based on weight loss
+// XP by weight
 function updateXPByWeight() {
   const startWeight = 277;
   const step = 10;
   let lost = startWeight - villainData.weight;
-  if (lost < 0) lost = 0;
+  if(lost < 0) lost = 0;
   let level = Math.floor(lost / step) + 1;
   villainData.level = level;
   let xpInStep = lost % step;
-  villainData.xp = xpInStep * 10; // 10 XP per lb in step
+  villainData.xp = xpInStep * 10;
   villainData.xpToNextLevel = step * 10;
   saveData();
   updateDisplay();
@@ -128,9 +139,10 @@ function updateXPByWeight() {
 function addMeal(){
   let name=document.getElementById('mealName').value;
   let c=parseInt(document.getElementById('mealCalories').value);
-  if(name && c){
-    villainData.meals.push({name,c,date:new Date().toLocaleDateString()});
-    villainData.caloriesToday+=c;
+  if(!c || isNaN(c)) c=0;
+  if(name && c>0){
+    villainData.meals.push({name, c, date: todayDate});
+    villainData.caloriesToday += c;
     saveData();
     renderMeals();
     updateDisplay();
@@ -142,7 +154,7 @@ function renderMeals(){
   ul.innerHTML='';
   villainData.meals.forEach((m,index)=>{
     let li=document.createElement('li');
-    li.textContent=`${m.name}: ${m.calories} cal `;
+    li.textContent=`${m.name}: ${m.c} cal `;
     let delBtn=document.createElement('button');
     delBtn.textContent='Remove';
     delBtn.style.marginLeft='10px';
@@ -153,7 +165,7 @@ function renderMeals(){
 }
 function removeMeal(index){
   let meal=villainData.meals[index];
-  villainData.caloriesToday-=meal.calories;
+  villainData.caloriesToday -= meal.c;
   villainData.meals.splice(index,1);
   saveData();
   renderMeals();
@@ -161,17 +173,26 @@ function removeMeal(index){
   updateProjectedChart();
 }
 
+// Add burned calories
+function addBurned(){
+  let burned=parseInt(document.getElementById('burnedCalories').value);
+  if(!burned || isNaN(burned)) burned=0;
+  villainData.burnedToday += burned;
+  saveData();
+  updateDisplay();
+  updateProjectedChart();
+}
+
 // Add weight
 function addWeight(){
-  let w = parseFloat(document.getElementById('weightInput').value);
-  if(!w) return;
-  villainData.weight = w;
-  villainData.weights.push({date:new Date().toLocaleDateString(), weight: w});
+  let w=parseFloat(document.getElementById('weightInput').value);
+  if(!w || isNaN(w)) return;
+  villainData.weight=w;
+  villainData.weights.push({date:todayDate, weight:w});
   updateXPByWeight();
   saveData();
   updateWeightChart();
   updateProjectedChart();
-  updateDisplay();
 }
 
 // Charts
@@ -194,59 +215,56 @@ function updateWeightChart(){
   weightChart.update();
 }
 
-// Projected chart using past actual calories + future goal calories
 function updateProjectedChart(){
   let labels=[], data=[];
-  let currentWeight=villainData.weight || 277;
-  let goalWeight=villainData.goalWeight || 180;
-  let maintenance=villainData.maintenanceCalories || 2500;
-  let dailyGoal=villainData.dailyCalorieGoal || 2000;
+  let currentWeight=villainData.weight||277;
+  let goalWeight=villainData.goalWeight||180;
+  let maintenance=villainData.maintenanceCalories||2500;
+  let dailyGoal=villainData.dailyCalorieGoal||2000;
 
-  let projectedWeight = currentWeight;
+  let projectedWeight=currentWeight;
 
-  // Group meals by date
-  let mealsByDate = {};
+  let mealsByDate={};
   villainData.meals.forEach(m=>{
     if(!mealsByDate[m.date]) mealsByDate[m.date]=0;
-    mealsByDate[m.date]+=m.calories;
+    mealsByDate[m.date]+=m.c;
   });
 
-  // Past logged days
-  let datesLogged = Object.keys(mealsByDate).sort((a,b)=>new Date(a)-new Date(b));
+  let datesLogged=Object.keys(mealsByDate).sort((a,b)=>new Date(a)-new Date(b));
   datesLogged.forEach(date=>{
-    let deficit = maintenance - mealsByDate[date];
-    if(deficit < 0) deficit = 0;
+    let deficit=maintenance-(mealsByDate[date]||0);
+    if(date===todayDate) deficit += villainData.burnedToday||0;
+    if(deficit<0) deficit=0;
     projectedWeight -= deficit/3500;
-    if(projectedWeight < goalWeight) projectedWeight = goalWeight;
+    if(projectedWeight<goalWeight) projectedWeight=goalWeight;
     labels.push(date);
     data.push(projectedWeight.toFixed(1));
   });
 
-  // Future days projection
   for(let i=1;i<=30;i++){
-    let futureDate = new Date();
+    let futureDate=new Date();
     futureDate.setDate(futureDate.getDate()+i);
-    let deficit = maintenance - dailyGoal;
-    if(deficit < 0) deficit = 0;
+    let deficit=maintenance-dailyGoal;
+    if(deficit<0) deficit=0;
     projectedWeight -= deficit/3500;
-    if(projectedWeight < goalWeight) projectedWeight = goalWeight;
+    if(projectedWeight<goalWeight) projectedWeight=goalWeight;
     labels.push(futureDate.toLocaleDateString());
     data.push(projectedWeight.toFixed(1));
   }
 
-  projectedChart.data.labels = labels;
-  projectedChart.data.datasets[0].data = data;
+  projectedChart.data.labels=labels;
+  projectedChart.data.datasets[0].data=data;
   projectedChart.update();
 }
 
 // Save goals
 function saveGoals(){
   let name=document.getElementById('villainName').value;
-  let goalW=parseFloat(document.getElementById('goalWeight').value);
-  let maintenance=parseInt(document.getElementById('maintenanceCalories').value);
-  let dailyGoal=parseInt(document.getElementById('dailyCalories').value);
-  let h=parseInt(document.getElementById('height').value);
-  let a=parseInt(document.getElementById('age').value);
+  let goalW=parseFloat(document.getElementById('goalWeight').value)||0;
+  let maintenance=parseInt(document.getElementById('maintenanceCalories').value)||0;
+  let dailyGoal=parseInt(document.getElementById('dailyCalories').value)||0;
+  let h=parseInt(document.getElementById('height').value)||0;
+  let a=parseInt(document.getElementById('age').value)||0;
 
   if(name) villainData.villainName=name;
   if(goalW) villainData.goalWeight=goalW;
@@ -262,21 +280,4 @@ function saveGoals(){
 
 // Dashboard display
 function updateDisplay(){
-  document.getElementById('villainNameDisplay').textContent=villainData.villainName;
-  document.getElementById('levelDisplay').textContent=villainData.level;
-  document.getElementById('xpDisplay').textContent=villainData.xp;
-  document.getElementById('xpNextDisplay').textContent=villainData.xpToNextLevel;
-  document.getElementById('xpFill').style.width=`${(villainData.xp/villainData.xpToNextLevel)*100}%`;
-  document.getElementById('caloriesTodayDisplay').textContent=villainData.caloriesToday;
-  document.getElementById('dailyCaloriesDisplay').textContent=villainData.dailyCalorieGoal;
-  document.getElementById('weightDisplay').textContent=villainData.weight;
-  document.getElementById('goalWeightDisplay').textContent=villainData.goalWeight;
-  renderMeals();
-}
-
-updateWeightChart();
-updateProjectedChart();
-updateDisplay();
-</script>
-</body>
-</html>
+  document.getElementById('
