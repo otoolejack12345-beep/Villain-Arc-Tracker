@@ -102,8 +102,8 @@ let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   lastUpdate: todayDate
 };
 
-// Reset daily calories if new day
-if (!villainData.lastUpdate || villainData.lastUpdate !== todayDate) {
+// Reset daily totals if new day
+if(villainData.lastUpdate !== todayDate){
   villainData.caloriesToday = 0;
   villainData.burnedToday = 0;
   villainData.lastUpdate = todayDate;
@@ -111,14 +111,14 @@ if (!villainData.lastUpdate || villainData.lastUpdate !== todayDate) {
 }
 
 // ---------- Charts ----------
-let weightChart=new Chart(document.getElementById('weightChart'),{
+let weightChart = new Chart(document.getElementById('weightChart'), {
   type:'line',
-  data:{labels:[], datasets:[{label:'Weight',data:[], borderColor:'lime', fill:false}]},
+  data:{labels:[], datasets:[{label:'Weight', data:[], borderColor:'lime', fill:false}]},
   options:{scales:{y:{beginAtZero:false}}}
 });
-let projectedChart=new Chart(document.getElementById('projectedChart'),{
+let projectedChart = new Chart(document.getElementById('projectedChart'), {
   type:'line',
-  data:{labels:[], datasets:[{label:'Projected Weight',data:[], borderColor:'yellow', fill:false}]},
+  data:{labels:[], datasets:[{label:'Projected Weight', data:[], borderColor:'yellow', fill:false}]},
   options:{scales:{y:{beginAtZero:false}}}
 });
 
@@ -126,26 +126,30 @@ let projectedChart=new Chart(document.getElementById('projectedChart'),{
 function saveData(){ localStorage.setItem('villainData', JSON.stringify(villainData)); }
 
 function updateDisplay(){
-  document.getElementById('villainNameDisplay').textContent=villainData.villainName;
-  document.getElementById('levelDisplay').textContent=villainData.level;
-  document.getElementById('xpDisplay').textContent=villainData.xp;
-  document.getElementById('xpNextDisplay').textContent=villainData.xpToNextLevel;
+  document.getElementById('villainNameDisplay').textContent = villainData.villainName;
+  document.getElementById('levelDisplay').textContent = villainData.level;
+  document.getElementById('xpDisplay').textContent = villainData.xp;
+  document.getElementById('xpNextDisplay').textContent = villainData.xpToNextLevel;
   document.getElementById('xpFill').style.width = `${(villainData.xp/villainData.xpToNextLevel)*100}%`;
 
-  document.getElementById('caloriesTodayDisplay').textContent = villainData.caloriesToday || 0;
-  document.getElementById('burnedTodayDisplay').textContent = villainData.burnedToday || 0;
-
-  let net = (villainData.caloriesToday || 0) - (villainData.burnedToday || 0);
-  document.getElementById('netCaloriesDisplay').textContent = net;
-
-  let remaining = (villainData.dailyCalorieGoal || 0) - net;
+  // Calories
+  let caloriesToday = Number(villainData.caloriesToday || 0);
+  let burnedToday = Number(villainData.burnedToday || 0);
+  let netCalories = caloriesToday - burnedToday;
+  let remaining = (villainData.dailyCalorieGoal || 2000) - netCalories;
   if(remaining<0) remaining=0;
+
+  document.getElementById('caloriesTodayDisplay').textContent = caloriesToday;
+  document.getElementById('burnedTodayDisplay').textContent = burnedToday;
+  document.getElementById('netCaloriesDisplay').textContent = netCalories;
   document.getElementById('caloriesRemainingDisplay').textContent = remaining;
+  document.getElementById('dailyCaloriesDisplay').textContent = villainData.dailyCalorieGoal;
 
   document.getElementById('weightDisplay').textContent = villainData.weight;
   document.getElementById('goalWeightDisplay').textContent = villainData.goalWeight;
 }
 
+// ---------- XP ----------
 function updateXPByWeight() {
   const startWeight = 277;
   const step = 10;
@@ -158,36 +162,40 @@ function updateXPByWeight() {
 
 // ---------- Meals ----------
 function renderMeals(){
-  let ul=document.getElementById('mealList');
-  ul.innerHTML='';
+  let ul = document.getElementById('mealList');
+  ul.innerHTML = '';
   villainData.meals.forEach((m,index)=>{
-    let li=document.createElement('li');
-    li.textContent=`${m.name}: ${m.calories} cal`;
-    let delBtn=document.createElement('button');
+    let li = document.createElement('li');
+    li.textContent = `${m.name}: ${m.calories} cal`;
+    let delBtn = document.createElement('button');
     delBtn.textContent='Remove';
     delBtn.style.marginLeft='10px';
-    delBtn.onclick=()=>removeMeal(index);
+    delBtn.onclick = ()=>removeMeal(index);
     li.appendChild(delBtn);
     ul.appendChild(li);
   });
 }
 
 function addMeal(){
-  let name=document.getElementById('mealName').value.trim();
-  let calories=Number(document.getElementById('mealCalories').value);
-  if(!name || isNaN(calories) || calories<=0){ alert("Enter valid meal name and calories."); return; }
+  let name = document.getElementById('mealName').value.trim();
+  let calories = Number(document.getElementById('mealCalories').value);
+  if(!name || isNaN(calories) || calories <= 0){ alert("Enter valid meal name and calories."); return; }
+
+  if(villainData.lastUpdate !== todayDate){ villainData.caloriesToday=0; villainData.burnedToday=0; villainData.lastUpdate=todayDate; }
+
   villainData.meals.push({name, calories, date:todayDate});
   villainData.caloriesToday += calories;
   saveData();
   renderMeals();
   updateDisplay();
   updateProjectedChart();
+
   document.getElementById('mealName').value='';
   document.getElementById('mealCalories').value='';
 }
 
 function removeMeal(index){
-  let meal=villainData.meals[index];
+  let meal = villainData.meals[index];
   if(meal.date===todayDate) villainData.caloriesToday -= meal.calories;
   villainData.meals.splice(index,1);
   saveData();
@@ -197,8 +205,11 @@ function removeMeal(index){
 }
 
 function addBurned(){
-  let burned=Number(document.getElementById('burnedCalories').value);
-  if(isNaN(burned) || burned<=0){ alert("Enter valid burned calories."); return; }
+  let burned = Number(document.getElementById('burnedCalories').value);
+  if(isNaN(burned) || burned <= 0){ alert("Enter valid burned calories."); return; }
+
+  if(villainData.lastUpdate !== todayDate){ villainData.caloriesToday=0; villainData.burnedToday=0; villainData.lastUpdate=todayDate; }
+
   villainData.burnedToday += burned;
   saveData();
   updateDisplay();
@@ -206,10 +217,11 @@ function addBurned(){
   document.getElementById('burnedCalories').value='';
 }
 
+// ---------- Weight ----------
 function addWeight(){
-  let w=parseFloat(document.getElementById('weightInput').value)||0;
+  let w = Number(document.getElementById('weightInput').value);
   if(w>0){
-    villainData.weight=w;
+    villainData.weight = w;
     villainData.weights.push({date:todayDate, weight:w});
     updateXPByWeight();
     saveData();
@@ -218,7 +230,6 @@ function addWeight(){
   }
 }
 
-// ---------- Charts ----------
 function updateWeightChart(){
   let labels=villainData.weights.map(w=>w.date);
   let data=villainData.weights.map(w=>w.weight);
@@ -235,23 +246,12 @@ function updateProjectedChart(){
   let dailyGoal=villainData.dailyCalorieGoal||2000;
   let projectedWeight=currentWeight;
 
-  let mealsByDate={};
+  // Past days
   villainData.meals.forEach(m=>{
-    if(!mealsByDate[m.date]) mealsByDate[m.date]=0;
-    mealsByDate[m.date]+=m.calories;
+    if(m.date===todayDate) projectedWeight -= ((maintenance - m.calories - villainData.burnedToday)/3500);
   });
 
-  let datesLogged=Object.keys(mealsByDate).sort((a,b)=>new Date(a)-new Date(b));
-  datesLogged.forEach(date=>{
-    let deficit=maintenance-(mealsByDate[date]||0);
-    if(date===todayDate) deficit += villainData.burnedToday||0;
-    if(deficit<0) deficit=0;
-    projectedWeight -= deficit/3500;
-    if(projectedWeight<goalWeight) projectedWeight=goalWeight;
-    labels.push(date);
-    data.push(projectedWeight.toFixed(1));
-  });
-
+  // Future 30 days
   for(let i=1;i<=30;i++){
     let futureDate=new Date();
     futureDate.setDate(futureDate.getDate()+i);
@@ -268,7 +268,7 @@ function updateProjectedChart(){
   projectedChart.update();
 }
 
-// ---------- Save Goals ----------
+// ---------- Goals ----------
 function saveGoals(){
   let name=document.getElementById('villainName').value;
   let goalW=parseFloat(document.getElementById('goalWeight').value)||0;
@@ -295,13 +295,12 @@ document.getElementById('addBurnedBtn').addEventListener('click', addBurned);
 document.getElementById('addWeightBtn').addEventListener('click', addWeight);
 document.getElementById('saveGoalsBtn').addEventListener('click', saveGoals);
 
-// Tab switching
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    let pageId = tab.getAttribute('data-page');
-    document.getElementById(pageId).classList.add('active');
+// Tabs
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById(tab.getAttribute('data-page')).classList.add('active');
     tab.classList.add('active');
   });
 });
