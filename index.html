@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Villain Arc Tracker</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0a1f44">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body { margin:0; font-family:sans-serif; background:#0a1f44; color:#fff; }
@@ -196,12 +194,12 @@ function removeMeal(index){
   updateProjectedChart();
 }
 
+// ---------- Burned Calories ----------
 function addBurned(){
   let burned = parseInt(document.getElementById('burnedCalories').value.trim()) || 0;
   if(burned <= 0){ alert("Enter valid burned calories."); return; }
 
   villainData.burnedToday = (villainData.burnedToday || 0) + burned;
-
   saveData();
   updateDisplay();
   updateProjectedChart();
@@ -296,6 +294,7 @@ renderMeals();
 updateDisplay();
 updateWeightChart();
 updateProjectedChart();
+
 </script>
 </body>
 </html>
