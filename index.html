@@ -23,7 +23,6 @@ button { cursor:pointer; }
 </head>
 <body>
 
-<!-- Dashboard -->
 <div id="dashboard" class="page active">
   <h2>Villain Dashboard</h2>
   <img id="avatar" src="icon.png" alt="Avatar" width="100">
@@ -39,7 +38,6 @@ button { cursor:pointer; }
   <canvas id="projectedChart"></canvas>
 </div>
 
-<!-- Calories Page -->
 <div id="caloriesPage" class="page">
   <h2>Log Calories</h2>
   <input type="text" id="mealName" placeholder="Meal Name">
@@ -53,7 +51,6 @@ button { cursor:pointer; }
   <p>Total Burned Today: <span id="burnedTodayDisplay"></span></p>
 </div>
 
-<!-- Weight Tracker -->
 <div id="weightPage" class="page">
   <h2>Weight Tracker</h2>
   <input type="number" id="weightInput" placeholder="Today's weight">
@@ -61,7 +58,6 @@ button { cursor:pointer; }
   <canvas id="weightChart"></canvas>
 </div>
 
-<!-- Goals Page -->
 <div id="goalsPage" class="page">
   <h2>Set Goals</h2>
   <input type="text" id="villainName" placeholder="Villain Name">
@@ -73,7 +69,6 @@ button { cursor:pointer; }
   <button id="saveGoalsBtn">Save Goals</button>
 </div>
 
-<!-- Tab Bar -->
 <div class="tab-bar">
   <div class="tab active" data-page="dashboard">Dashboard</div>
   <div class="tab" data-page="caloriesPage">Calories</div>
@@ -92,7 +87,7 @@ let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   caloriesToday: 0,
   burnedToday: 0,
   maintenanceCalories: 2500,
-  dailyCalorieGoal: 2000,
+  dailyCalorieGoal: 2500,
   weight: 277,
   goalWeight: 180,
   meals: [],
@@ -101,6 +96,11 @@ let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   age: 19,
   lastUpdate: todayDate
 };
+
+// Ensure numeric fields
+villainData.caloriesToday = Number(villainData.caloriesToday || 0);
+villainData.burnedToday = Number(villainData.burnedToday || 0);
+villainData.dailyCalorieGoal = Number(villainData.dailyCalorieGoal || 2500);
 
 // Reset daily totals if new day
 if(villainData.lastUpdate !== todayDate){
@@ -136,7 +136,7 @@ function updateDisplay(){
   let caloriesToday = Number(villainData.caloriesToday || 0);
   let burnedToday = Number(villainData.burnedToday || 0);
   let netCalories = caloriesToday - burnedToday;
-  let remaining = (villainData.dailyCalorieGoal || 2000) - netCalories;
+  let remaining = (villainData.dailyCalorieGoal || 2500) - netCalories;
   if(remaining<0) remaining=0;
 
   document.getElementById('caloriesTodayDisplay').textContent = caloriesToday;
@@ -243,22 +243,17 @@ function updateProjectedChart(){
   let currentWeight=villainData.weight||277;
   let goalWeight=villainData.goalWeight||180;
   let maintenance=villainData.maintenanceCalories||2500;
-  let dailyGoal=villainData.dailyCalorieGoal||2000;
+  let dailyGoal=villainData.dailyCalorieGoal||2500;
   let projectedWeight=currentWeight;
-
-  // Past days
-  villainData.meals.forEach(m=>{
-    if(m.date===todayDate) projectedWeight -= ((maintenance - m.calories - villainData.burnedToday)/3500);
-  });
 
   // Future 30 days
   for(let i=1;i<=30;i++){
-    let futureDate=new Date();
-    futureDate.setDate(futureDate.getDate()+i);
     let deficit=maintenance-dailyGoal;
     if(deficit<0) deficit=0;
     projectedWeight -= deficit/3500;
     if(projectedWeight<goalWeight) projectedWeight=goalWeight;
+    let futureDate=new Date();
+    futureDate.setDate(futureDate.getDate()+i);
     labels.push(futureDate.toLocaleDateString());
     data.push(projectedWeight.toFixed(1));
   }
