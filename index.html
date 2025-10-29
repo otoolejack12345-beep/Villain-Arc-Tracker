@@ -17,7 +17,7 @@ body { margin:0; font-family:sans-serif; background:#0a1f44; color:#fff; }
 #xpBar { width:100%; background:#12295e; height:20px; border-radius:10px; margin:10px 0; }
 #xpFill { height:100%; background:#00ff00; width:0%; border-radius:10px; }
 input, button { margin:5px 0; padding:5px; }
-canvas { background:#081634; border-radius:10px; margin-top:10px; }
+canvas { background:#081634; border-radius:10px; }
 button { cursor:pointer; }
 </style>
 <script>
@@ -38,13 +38,8 @@ if('serviceWorker' in navigator){
   <p>Level: <span id="levelDisplay"></span></p>
   <p>XP: <span id="xpDisplay"></span> / <span id="xpNextDisplay"></span></p>
   <div id="xpBar"><div id="xpFill"></div></div>
+  <p>Calories Today: <span id="caloriesTodayDisplay"></span> / <span id="dailyCaloriesDisplay"></span></p>
   <p>Weight: <span id="weightDisplay"></span> lbs / Goal: <span id="goalWeightDisplay"></span> lbs</p>
-  <p>Calories Today: <span id="caloriesTodayDisplay"></span> (Net: <span id="netCaloriesDisplay"></span>) / Goal: <span id="dailyCaloriesDisplay"></span></p>
-  <p>Calories Remaining: <span id="caloriesRemainingDisplay"></span></p>
-
-  <h3>Calories Progress</h3>
-  <canvas id="caloriesChart"></canvas>
-
   <h3>Projected Weight Loss (next 30 days)</h3>
   <canvas id="projectedChart"></canvas>
 </div>
@@ -56,11 +51,6 @@ if('serviceWorker' in navigator){
   <input type="number" id="mealCalories" placeholder="Calories">
   <button onclick="addMeal()">Add Meal</button>
   <ul id="mealList"></ul>
-
-  <h3>Calories Burned</h3>
-  <input type="number" id="burnedCalories" placeholder="Calories Burned">
-  <button onclick="addBurned()">Add Burned Calories</button>
-  <p>Total Burned Today: <span id="burnedTodayDisplay"></span></p>
 </div>
 
 <!-- Weight Tracker Page -->
@@ -92,14 +82,12 @@ if('serviceWorker' in navigator){
 </div>
 
 <script>
-let todayDate = new Date().toLocaleDateString();
 let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   villainName: 'Dark Villain',
   level: 1,
   xp: 0,
   xpToNextLevel: 100,
   caloriesToday:0,
-  burnedToday:0,
   maintenanceCalories: 2500,
   dailyCalorieGoal:2000,
   weight:277,
@@ -109,14 +97,6 @@ let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   height:73,
   age:19
 };
-
-// Reset daily calories if a new day
-if(villainData.lastUpdate !== todayDate){
-  villainData.caloriesToday = 0;
-  villainData.burnedToday = 0;
-  villainData.lastUpdate = todayDate;
-  saveData();
-}
 
 // Tab switching
 function showPage(id,event){
@@ -138,7 +118,7 @@ function updateXPByWeight() {
   let level = Math.floor(lost / step) + 1;
   villainData.level = level;
   let xpInStep = lost % step;
-  villainData.xp = xpInStep * 10;
+  villainData.xp = xpInStep * 10; // 10 XP per lb in step
   villainData.xpToNextLevel = step * 10;
   saveData();
   updateDisplay();
@@ -149,12 +129,12 @@ function addMeal(){
   let name=document.getElementById('mealName').value;
   let c=parseInt(document.getElementById('mealCalories').value);
   if(name && c){
-    villainData.meals.push({name,c,date:todayDate});
+    villainData.meals.push({name,c,date:new Date().toLocaleDateString()});
     villainData.caloriesToday+=c;
     saveData();
     renderMeals();
     updateDisplay();
-    updateCharts();
+    updateProjectedChart();
   }
 }
 function renderMeals(){
@@ -178,17 +158,7 @@ function removeMeal(index){
   saveData();
   renderMeals();
   updateDisplay();
-  updateCharts();
-}
-
-// Add burned calories
-function addBurned(){
-  let burned=parseInt(document.getElementById('burnedCalories').value);
-  if(!burned) return;
-  villainData.burnedToday+=burned;
-  saveData();
-  updateDisplay();
-  updateCharts();
+  updateProjectedChart();
 }
 
 // Add weight
@@ -196,10 +166,11 @@ function addWeight(){
   let w = parseFloat(document.getElementById('weightInput').value);
   if(!w) return;
   villainData.weight = w;
-  villainData.weights.push({date:todayDate, weight: w});
+  villainData.weights.push({date:new Date().toLocaleDateString(), weight: w});
   updateXPByWeight();
   saveData();
-  updateCharts();
+  updateWeightChart();
+  updateProjectedChart();
   updateDisplay();
 }
 
@@ -214,20 +185,7 @@ let projectedChart=new Chart(document.getElementById('projectedChart'),{
   data:{labels:[], datasets:[{label:'Projected Weight',data:[], borderColor:'yellow', fill:false}]},
   options:{scales:{y:{beginAtZero:false}}}
 });
-let caloriesChart=new Chart(document.getElementById('caloriesChart'),{
-  type:'line',
-  data:{labels:[], datasets:[{label:'Calories Consumed', data:[], borderColor:'orange', fill:false},{label:'Daily Goal', data:[], borderColor:'green', fill:false}]},
-  options:{scales:{y:{beginAtZero:true}}}
-});
 
-// Update all charts
-function updateCharts(){
-  updateWeightChart();
-  updateProjectedChart();
-  updateCaloriesChart();
-}
-
-// Weight chart
 function updateWeightChart(){
   let labels=villainData.weights.map(w=>w.date);
   let data=villainData.weights.map(w=>w.weight);
@@ -236,7 +194,7 @@ function updateWeightChart(){
   weightChart.update();
 }
 
-// Projected weight
+// Projected chart using past actual calories + future goal calories
 function updateProjectedChart(){
   let labels=[], data=[];
   let currentWeight=villainData.weight || 277;
@@ -246,20 +204,20 @@ function updateProjectedChart(){
 
   let projectedWeight = currentWeight;
 
-  // Past logged days
+  // Group meals by date
   let mealsByDate = {};
   villainData.meals.forEach(m=>{
     if(!mealsByDate[m.date]) mealsByDate[m.date]=0;
     mealsByDate[m.date]+=m.calories;
   });
 
+  // Past logged days
   let datesLogged = Object.keys(mealsByDate).sort((a,b)=>new Date(a)-new Date(b));
   datesLogged.forEach(date=>{
     let deficit = maintenance - mealsByDate[date];
-    deficit += villainData.burnedToday; // subtract burned calories for today
-    if(deficit < 0) deficit=0;
+    if(deficit < 0) deficit = 0;
     projectedWeight -= deficit/3500;
-    if(projectedWeight < goalWeight) projectedWeight=goalWeight;
+    if(projectedWeight < goalWeight) projectedWeight = goalWeight;
     labels.push(date);
     data.push(projectedWeight.toFixed(1));
   });
@@ -269,7 +227,7 @@ function updateProjectedChart(){
     let futureDate = new Date();
     futureDate.setDate(futureDate.getDate()+i);
     let deficit = maintenance - dailyGoal;
-    if(deficit <0) deficit=0;
+    if(deficit < 0) deficit = 0;
     projectedWeight -= deficit/3500;
     if(projectedWeight < goalWeight) projectedWeight = goalWeight;
     labels.push(futureDate.toLocaleDateString());
@@ -279,17 +237,6 @@ function updateProjectedChart(){
   projectedChart.data.labels = labels;
   projectedChart.data.datasets[0].data = data;
   projectedChart.update();
-}
-
-// Calories progress chart
-function updateCaloriesChart(){
-  let labels = ['Today'];
-  let consumed = [villainData.caloriesToday];
-  let goal = [villainData.dailyCalorieGoal];
-  caloriesChart.data.labels = labels;
-  caloriesChart.data.datasets[0].data = consumed;
-  caloriesChart.data.datasets[1].data = goal;
-  caloriesChart.update();
 }
 
 // Save goals
@@ -310,7 +257,7 @@ function saveGoals(){
 
   saveData();
   updateDisplay();
-  updateCharts();
+  updateProjectedChart();
 }
 
 // Dashboard display
@@ -321,18 +268,15 @@ function updateDisplay(){
   document.getElementById('xpNextDisplay').textContent=villainData.xpToNextLevel;
   document.getElementById('xpFill').style.width=`${(villainData.xp/villainData.xpToNextLevel)*100}%`;
   document.getElementById('caloriesTodayDisplay').textContent=villainData.caloriesToday;
-  let net = villainData.caloriesToday - villainData.burnedToday;
-  document.getElementById('netCaloriesDisplay').textContent=net;
-  document.getElementById('caloriesRemainingDisplay').textContent = Math.max(villainData.dailyCalorieGoal - net,0);
   document.getElementById('dailyCaloriesDisplay').textContent=villainData.dailyCalorieGoal;
   document.getElementById('weightDisplay').textContent=villainData.weight;
   document.getElementById('goalWeightDisplay').textContent=villainData.goalWeight;
-  document.getElementById('burnedTodayDisplay').textContent=villainData.burnedToday;
   renderMeals();
 }
 
+updateWeightChart();
+updateProjectedChart();
 updateDisplay();
-updateCharts();
 </script>
 </body>
 </html>
