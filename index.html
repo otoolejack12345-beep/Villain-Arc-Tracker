@@ -104,11 +104,6 @@ if(villainData.lastUpdate !== todayDate){
   localStorage.setItem('villainData', JSON.stringify(villainData));
 }
 
-// Ensure numeric values
-villainData.caloriesToday = Number(villainData.caloriesToday || 0);
-villainData.burnedToday = Number(villainData.burnedToday || 0);
-villainData.dailyCalorieGoal = Number(villainData.dailyCalorieGoal || 2500);
-
 // Charts
 let weightChart = new Chart(document.getElementById('weightChart'), {
   type:'line',
@@ -176,11 +171,11 @@ function renderMeals(){
 
 function addMeal(){
   let name = document.getElementById('mealName').value.trim();
-  let calories = parseInt(document.getElementById('mealCalories').value) || 0;
+  let calories = parseInt(document.getElementById('mealCalories').value.trim()) || 0;
   if(!name || calories <= 0){ alert("Enter valid meal name and calories."); return; }
 
   villainData.meals.push({name, calories, date: todayDate});
-  villainData.caloriesToday += calories;
+  villainData.caloriesToday = (villainData.caloriesToday || 0) + calories;
 
   saveData();
   renderMeals();
@@ -202,10 +197,10 @@ function removeMeal(index){
 }
 
 function addBurned(){
-  let burned = parseInt(document.getElementById('burnedCalories').value) || 0;
+  let burned = parseInt(document.getElementById('burnedCalories').value.trim()) || 0;
   if(burned <= 0){ alert("Enter valid burned calories."); return; }
 
-  villainData.burnedToday += burned;
+  villainData.burnedToday = (villainData.burnedToday || 0) + burned;
 
   saveData();
   updateDisplay();
@@ -302,6 +297,5 @@ updateDisplay();
 updateWeightChart();
 updateProjectedChart();
 </script>
-
 </body>
 </html>
