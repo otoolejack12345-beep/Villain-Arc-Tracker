@@ -288,4 +288,23 @@ function updateDisplay(){
   document.getElementById('xpDisplay').textContent=villainData.xp;
   document.getElementById('xpNextDisplay').textContent=villainData.xpToNextLevel;
   document.getElementById('xpFill').style.width = `${(villainData.xp/villainData.xpToNextLevel)*100}%`;
-  document.getElementById('caloriesTodayDisplay').textContent = Number(villainData.calories
+  document.getElementById('caloriesTodayDisplay').textContent = Number(villainData.caloriesToday||0);
+  document.getElementById('burnedTodayDisplay').textContent = Number(villainData.burnedToday||0);
+  let net = (villainData.caloriesToday||0) - (villainData.burnedToday||0);
+  document.getElementById('netCaloriesDisplay').textContent = net;
+  document.getElementById('dailyCaloriesDisplay').textContent = villainData.dailyCalorieGoal||0;
+  let remaining = (villainData.dailyCalorieGoal||0) - net;
+  document.getElementById('caloriesRemainingDisplay').textContent = remaining;
+  document.getElementById('weightDisplay').textContent = villainData.weight;
+  document.getElementById('goalWeightDisplay').textContent = villainData.goalWeight;
+}
+
+// ---------- Initialize ----------
+renderMeals();
+updateDisplay();
+updateWeightChart();
+updateProjectedChart();
+</script>
+
+</body>
+</html>
