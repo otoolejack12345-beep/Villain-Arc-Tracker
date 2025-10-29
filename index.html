@@ -77,7 +77,6 @@ button { cursor:pointer; }
 </div>
 
 <script>
-// ---------- Initialization ----------
 let todayDate = new Date().toLocaleDateString();
 let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   villainName: 'Dark Villain',
@@ -97,12 +96,7 @@ let villainData = JSON.parse(localStorage.getItem('villainData')) || {
   lastUpdate: todayDate
 };
 
-// Ensure numeric fields
-villainData.caloriesToday = Number(villainData.caloriesToday || 0);
-villainData.burnedToday = Number(villainData.burnedToday || 0);
-villainData.dailyCalorieGoal = Number(villainData.dailyCalorieGoal || 2500);
-
-// Reset daily totals if new day
+// Reset daily totals once at page load
 if(villainData.lastUpdate !== todayDate){
   villainData.caloriesToday = 0;
   villainData.burnedToday = 0;
@@ -110,7 +104,12 @@ if(villainData.lastUpdate !== todayDate){
   localStorage.setItem('villainData', JSON.stringify(villainData));
 }
 
-// ---------- Charts ----------
+// Ensure numeric values
+villainData.caloriesToday = Number(villainData.caloriesToday || 0);
+villainData.burnedToday = Number(villainData.burnedToday || 0);
+villainData.dailyCalorieGoal = Number(villainData.dailyCalorieGoal || 2500);
+
+// Charts
 let weightChart = new Chart(document.getElementById('weightChart'), {
   type:'line',
   data:{labels:[], datasets:[{label:'Weight', data:[], borderColor:'lime', fill:false}]},
@@ -132,11 +131,10 @@ function updateDisplay(){
   document.getElementById('xpNextDisplay').textContent = villainData.xpToNextLevel;
   document.getElementById('xpFill').style.width = `${(villainData.xp/villainData.xpToNextLevel)*100}%`;
 
-  // Calories
   let caloriesToday = Number(villainData.caloriesToday || 0);
   let burnedToday = Number(villainData.burnedToday || 0);
   let netCalories = caloriesToday - burnedToday;
-  let remaining = (villainData.dailyCalorieGoal || 2500) - netCalories;
+  let remaining = Number(villainData.dailyCalorieGoal || 2500) - netCalories;
   if(remaining<0) remaining=0;
 
   document.getElementById('caloriesTodayDisplay').textContent = caloriesToday;
@@ -178,13 +176,12 @@ function renderMeals(){
 
 function addMeal(){
   let name = document.getElementById('mealName').value.trim();
-  let calories = Number(document.getElementById('mealCalories').value);
-  if(!name || isNaN(calories) || calories <= 0){ alert("Enter valid meal name and calories."); return; }
+  let calories = parseInt(document.getElementById('mealCalories').value) || 0;
+  if(!name || calories <= 0){ alert("Enter valid meal name and calories."); return; }
 
-  if(villainData.lastUpdate !== todayDate){ villainData.caloriesToday=0; villainData.burnedToday=0; villainData.lastUpdate=todayDate; }
-
-  villainData.meals.push({name, calories, date:todayDate});
+  villainData.meals.push({name, calories, date: todayDate});
   villainData.caloriesToday += calories;
+
   saveData();
   renderMeals();
   updateDisplay();
@@ -205,21 +202,21 @@ function removeMeal(index){
 }
 
 function addBurned(){
-  let burned = Number(document.getElementById('burnedCalories').value);
-  if(isNaN(burned) || burned <= 0){ alert("Enter valid burned calories."); return; }
-
-  if(villainData.lastUpdate !== todayDate){ villainData.caloriesToday=0; villainData.burnedToday=0; villainData.lastUpdate=todayDate; }
+  let burned = parseInt(document.getElementById('burnedCalories').value) || 0;
+  if(burned <= 0){ alert("Enter valid burned calories."); return; }
 
   villainData.burnedToday += burned;
+
   saveData();
   updateDisplay();
   updateProjectedChart();
+
   document.getElementById('burnedCalories').value='';
 }
 
 // ---------- Weight ----------
 function addWeight(){
-  let w = Number(document.getElementById('weightInput').value);
+  let w = parseFloat(document.getElementById('weightInput').value);
   if(w>0){
     villainData.weight = w;
     villainData.weights.push({date:todayDate, weight:w});
@@ -246,7 +243,6 @@ function updateProjectedChart(){
   let dailyGoal=villainData.dailyCalorieGoal||2500;
   let projectedWeight=currentWeight;
 
-  // Future 30 days
   for(let i=1;i<=30;i++){
     let deficit=maintenance-dailyGoal;
     if(deficit<0) deficit=0;
@@ -284,13 +280,7 @@ function saveGoals(){
   updateProjectedChart();
 }
 
-// ---------- Event Listeners ----------
-document.getElementById('addMealBtn').addEventListener('click', addMeal);
-document.getElementById('addBurnedBtn').addEventListener('click', addBurned);
-document.getElementById('addWeightBtn').addEventListener('click', addWeight);
-document.getElementById('saveGoalsBtn').addEventListener('click', saveGoals);
-
-// Tabs
+// ---------- Tabs ----------
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -299,6 +289,12 @@ document.querySelectorAll('.tab').forEach(tab=>{
     tab.classList.add('active');
   });
 });
+
+// ---------- Event Listeners ----------
+document.getElementById('addMealBtn').addEventListener('click', addMeal);
+document.getElementById('addBurnedBtn').addEventListener('click', addBurned);
+document.getElementById('addWeightBtn').addEventListener('click', addWeight);
+document.getElementById('saveGoalsBtn').addEventListener('click', saveGoals);
 
 // ---------- Initialize ----------
 renderMeals();
